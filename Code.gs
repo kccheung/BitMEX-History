@@ -21,10 +21,10 @@
 // Create sheet called "Settings"
 // Add a row for each bot with the following headings - currently rows 1-2 and columns 1-5 are all ignored and only columns 6 & 7 are used.
 //
-// Configuration						
+// Configuration
 // Name<tab>Description<tab>Exchange<tab>Currency<tab>Download Limit<tab>API Key<tab>API Secret
 // BOT1<tab>Short Bot<tab>BitMEX<tab>XBT<tab>100<tab><your key><tab><your secret>
-// BOT2<tab>Long Bot<tab>BitMEX<tab>XBT<tab>100<tab><your key><tab><your secret>				
+// BOT2<tab>Long Bot<tab>BitMEX<tab>XBT<tab>100<tab><your key><tab><your secret>
 //
 // Use the Tool > Script Editor for you Google Sheet to add all of this to the editor, the save it.
 // Save it all, the close and reopen you Google Sheet. You will be prompted to give the scrip run permissions.
@@ -37,42 +37,44 @@
 // 4) Use the "Exchange" column for getting the history from other exchanges
 //
 function onOpen() {
-  createMenu();
+    createMenu();
 }
 
 
 function createMenu() {
     var ui = SpreadsheetApp.getUi();
-    ui.createMenu('Get BitMEX History')
-      .addItem('Download History', 'GetHistory')
-      .addItem('About', 'about')
-      .addToUi();
+    ui.createMenu('BitMEX Helper')
+        .addItem('Download History', 'getHistory')
+        .addItem('About', 'about')
+        .addToUi();
 }
 
 
-function GetHistory() {
+function getHistory() {
+    // Read the settings for each bot and call bmxGetHistory() for each one
+    //
+    // sheetConf: The name of the configuration sheet to read from
+    //
+    var ss = SpreadsheetApp.getActive();
+    var notBlank = true;
+    var i = 3;
+    var sheetConf = "Settings";
 
-  // Read the settings for each bot and call BitMEXGetHistory() for each one
-  //
-  // sheetConf: The name of the configuration sheet to read from
-  //
-  var ss = SpreadsheetApp.getActive();
-  var notBlank=true, i=3;
-  var sheetConf = "Settings";
-  
-  // For each bot listed in settings; get the API keys from the sheet
-  while (notBlank){
-    var botName = ss.getSheetByName(sheetConf).getRange(i,1).getValue();
-    var limit = ss.getSheetByName(sheetConf).getRange(i,5).getValue();
-    var sLimit = Utilities.formatString('%d', limit);
-    var key = ss.getSheetByName(sheetConf).getRange(i,6).getValue();
-    var secret = ss.getSheetByName(sheetConf).getRange(i,7).getValue();
-    var destName = "PASTE" + String(i-2);
-    if (botName!==""){
-      BitMEXGetHistory(sLimit,key,secret,destName);
-      i++;
-    }else{ notBlank = false;}
-  }   
+    // For each bot listed in settings; get the API keys from the sheet
+    while (notBlank) {
+        var botName = ss.getSheetByName(sheetConf).getRange(i, 1).getValue();
+        var limit = ss.getSheetByName(sheetConf).getRange(i, 5).getValue();
+        var sLimit = Utilities.formatString('%d', limit);
+        var key = ss.getSheetByName(sheetConf).getRange(i, 6).getValue();
+        var secret = ss.getSheetByName(sheetConf).getRange(i, 7).getValue();
+        var destName = ss.getSheetByName(sheetConf).getRange(i, 8).getValue();
+        if (botName !== "") {
+            bmxGetHistory(sLimit, key, secret, destName);
+            i++;
+        } else {
+            notBlank = false;
+        }
+    }
 }
 
 //
@@ -81,84 +83,88 @@ function GetHistory() {
 // apiSecret: the cell coordinate for reading the API secret
 // destSheet: The name of the configuration sheet to read from and write to
 //
-function BitMEXGetHistory(downLimit,apiKey,apiSecret,destSheet){
+/**
+ * @param {BigInteger} downLimit
+ * @param {string} apiKey
+ * @param {string} apiSecret
+ * @param {string} destSheet
+ */
+function bmxGetHistory(downLimit, apiKey, apiSecret, destSheet) {
+    // Constrcut the URL https://www.bitmex.com/api/v1/user/walletHistory?currency=XBt&count=100
+    var webSite = "https://www.bitmex.com";
+    var path = "/api/v1/user/walletHistory?currency=XBt&count=" + downLimit;
+    var url = webSite + path;
 
-  // Constrcut the URL https://www.bitmex.com/api/v1/user/walletHistory?currency=XBt&count=100
-  var webSite = "https://www.bitmex.com";
-  var path = "/api/v1/user/walletHistory?currency=XBt&count=" + downLimit;
-  url = webSite + path;
-  
-  // Construct the signature
-  var nonce = Number(new Date().getTime()).toFixed(0);
-  var string = 'GET'+path+nonce;
-  var sKey = Utilities.computeHmacSha256Signature(string, apiSecret);
-  sKey = sKey.map(function(e) {
-      var v = (e < 0 ? e + 256 : e).toString(16);
-      return v.length == 1 ? "0" + v : v;
-  }).join("");
+    // Construct the signature
+    var nonce = Number(new Date().getTime()).toFixed(0);
+    var string = 'GET' + path + nonce;
+    var sKey = Utilities.computeHmacSha256Signature(string, apiSecret);
+    sKey = sKey.map(function(e) {
+        var v = (e < 0 ? e + 256 : e).toString(16);
+        return v.length == 1 ? "0" + v : v;
+    }).join("");
 
-  // Construct the header details
-  var params = {
-    'method': 'GET',
-    'headers': {
-      'api-signature': sKey,
-      'api-key': apiKey,
-      'api-nonce': nonce
-    },
-    'muteHttpExceptions': true
-  };
-  
-  // Send the request to the BitMEX API and receive the user data.
-  var response = UrlFetchApp.fetch(url, params);
-  var dataAll = JSON.parse(response.getContentText());
-  var dataSet = dataAll;
-  
-  //Logger.log(dataSet);
+    // Construct the header details
+    var params = {
+        'method': 'GET',
+        'headers': {
+            'api-signature': sKey,
+            'api-key': apiKey,
+            'api-nonce': nonce
+        },
+        'muteHttpExceptions': true
+    };
 
-  var rows = [], data;
-  var tempDate;
-  
-  // write the data in rows
-  for (i = 0; i < dataSet.length; i++) {
-    data = dataSet[i];
-    if (data.transactTime !== null){
-//      tempDate = new Date(data.transactTime.replace(/^(\d{1,2})[-.](\d{1,2})[-.](\d{4})/g,"$3/$2/$1"));
-      tempDate = data.transactTime.replace("T", " ");
-      tempDate = tempDate.replace("Z", "");
-      Logger.log(data.transactTime + " > " + tempDate);
-    }else{
-      tempDate = "null"
+    // Send the request to the BitMEX API and receive the user data.
+    var response = UrlFetchApp.fetch(url, params);
+    var dataAll = JSON.parse(response.getContentText());
+    var dataSet = dataAll;
+
+    // Logger.log(dataSet);
+    var rows = [];
+    var data;
+    var tempDate;
+
+    // write the data in rows
+    for (var i = 0; i < dataSet.length; i++) {
+        data = dataSet[i];
+        if (data.transactTime !== null) {
+            // tempDate = new Date(data.transactTime.replace(/^(\d{1,2})[-.](\d{1,2})[-.](\d{4})/g,"$3/$2/$1"));
+            tempDate = data.transactTime.replace("T", " ");
+            tempDate = tempDate.replace("Z", "");
+            Logger.log(data.transactTime + " > " + tempDate);
+        } else {
+            tempDate = "null"
+        }
+        rows.push([tempDate, data.transactType, data.amount, data.fee, data.address, data.transactStatus, data.walletBalance]);
     }
-    rows.push([tempDate,data.transactType,data.amount,data.fee,data.address,data.transactStatus,data.walletBalance]);
-  }
 
-  var ss = SpreadsheetApp.getActive();
-  var currentSheet = ss.getSheetByName(destSheet);
-  currentSheet.clearContents();
-  var header = [];
-  header.push(["transactTime","transactType","amount","fee","address","transactStatus","walletBalance"]);
-  var cell = ss.getSheetByName(destSheet).getRange(1,1,header.length, 7);
-  cell.setValues(header);
-  var cell = ss.getSheetByName(destSheet).getRange(2,1,rows.length, 7);
-  cell.setValues(rows);
-
+    var ss = SpreadsheetApp.getActive();
+    var currentSheet = ss.getSheetByName(destSheet);
+    // currentSheet.clearContents();
+    var header = [];
+    header.push(["transactTime", "transactType", "amount", "fee", "address", "transactStatus", "walletBalance"]);
+    var cell = ss.getSheetByName(destSheet).getRange(1, 1, header.length, 7);
+    cell.setValues(header);
+    var cell = ss.getSheetByName(destSheet).getRange(2, 1, rows.length, 7);
+    cell.setValues(rows);
 }
-                     
+
 
 function about() {
-  // Display a modeless dialog box with custom HtmlService content.
-  var htmlOutput = HtmlService
-     .createHtmlOutput('<font face="verdana"><p><b>Developed by Tooraj Enayati</b></p>' +
-                       '<p>Copying and distribution is promitted as long as credits are given</p>' +
-                       '<p><b>Donation are greatly appreciated</b></p>' +
-                       '<p>BTC: 3QSSMwKuoS4wRJQCNofnqBVitpheBDPx8w<br>' +
-                       'ETH: 0x5d883ef2ddac91034186b732cd1126cdb5d2c0f4<br>' +
-                       'LTC: MBsbj8q38seA3Pk6tZk1WY7DkFRf2Yf6x1</p>' +
-                       '<p><b>Twitter</b>: @tooraj_enayati<br>' +
-                       '<b>Telegram</b>: ToorajEnayati<br>' +
-                       '<b>Email</b>: tooraj@isc.com.au<br>' +
-                       '<b>Discord</b>: tooraj#7318</p></font>')
-     .setWidth(450)
-     .setHeight(350);
-  SpreadsheetApp.getUi().showModelessDialog(htmlOutput, 'BitMEX History Downloader');
+    // Display a modeless dialog box with custom HtmlService content.
+    var htmlOutput = HtmlService
+        .createHtmlOutput('<font face="verdana"><p><b>Developed by Tooraj Enayati</b></p>' +
+            '<p>Copying and distribution is promitted as long as credits are given</p>' +
+            '<p><b>Donation are greatly appreciated</b></p>' +
+            '<p>BTC: 3QSSMwKuoS4wRJQCNofnqBVitpheBDPx8w<br>' +
+            'ETH: 0x5d883ef2ddac91034186b732cd1126cdb5d2c0f4<br>' +
+            'LTC: MBsbj8q38seA3Pk6tZk1WY7DkFRf2Yf6x1</p>' +
+            '<p><b>Twitter</b>: @tooraj_enayati<br>' +
+            '<b>Telegram</b>: ToorajEnayati<br>' +
+            '<b>Email</b>: tooraj@isc.com.au<br>' +
+            '<b>Discord</b>: tooraj#7318</p></font>')
+        .setWidth(450)
+        .setHeight(350);
+    SpreadsheetApp.getUi().showModelessDialog(htmlOutput, 'BitMEX History Downloader');
 }
