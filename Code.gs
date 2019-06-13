@@ -94,6 +94,7 @@ function bmxGetHistory(downLimit, apiKey, apiSecret, destSheet) {
     var webSite = "https://www.bitmex.com";
     var path = "/api/v1/user/walletHistory?currency=XBt&count=" + downLimit;
     var url = webSite + path;
+    const COLUMN_INDEX = 5; // TODO: set your sheet filter here
 
     // Construct the signature
     var nonce = Number(new Date().getTime()).toFixed(0);
@@ -141,15 +142,31 @@ function bmxGetHistory(downLimit, apiKey, apiSecret, destSheet) {
 
     var ss = SpreadsheetApp.getActive();
     var currentSheet = ss.getSheetByName(destSheet);
-    // currentSheet.clearContents();
     var header = [];
     header.push(["transactTime", "transactType", "amount", "fee", "address", "transactStatus", "walletBalance"]);
     var cell = ss.getSheetByName(destSheet).getRange(1, 1, header.length, 7);
     cell.setValues(header);
     var cell = ss.getSheetByName(destSheet).getRange(2, 1, rows.length, 7);
     cell.setValues(rows);
+    refreshFilter(destSheet, COLUMN_INDEX);
 }
 
+
+/**
+ * @param {string} destSheet
+ * @param {number} columnIndex
+ */
+function refreshFilter(destSheet, columnIndex) {
+    var ss = SpreadsheetApp.getActive();
+    var currentSheet = ss.getSheetByName(destSheet);
+    var filter = currentSheet.getFilter();
+    if (filter) {
+        var criteria = filter.getColumnFilterCriteria(columnIndex);
+        if (criteria) {
+            filter.setColumnFilterCriteria(columnIndex, criteria)
+        }
+    }
+}
 
 function about() {
     // Display a modeless dialog box with custom HtmlService content.
