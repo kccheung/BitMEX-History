@@ -44,14 +44,15 @@ function onOpen() {
 function createMenu() {
     var ui = SpreadsheetApp.getUi();
     ui.createMenu('BitMEX Helper')
-        .addItem('Download History', 'getHistory')
+        .addItem('Download Trade History', 'getTradingHistory')
+        .addItem('Download Funding History', 'getFungingHistory')
         .addItem('About', 'about')
         .addToUi();
 }
 
 
-function getHistory() {
-    // Read the settings for each bot and call bmxGetHistory() for each one
+function getTradingHistory() {
+    // Read the settings for each bot and call bmxGetTradingHistory() for each one
     //
     // sheetConf: The name of the configuration sheet to read from
     //
@@ -69,7 +70,7 @@ function getHistory() {
         var secret = ss.getSheetByName(sheetConf).getRange(i, 7).getValue();
         var destName = ss.getSheetByName(sheetConf).getRange(i, 8).getValue();
         if (botName !== "") {
-            bmxGetHistory(sLimit, key, secret, destName);
+            bmxGetTradingHistory(sLimit, key, secret, destName);
             i++;
         } else {
             notBlank = false;
@@ -89,37 +90,10 @@ function getHistory() {
  * @param {string} apiSecret
  * @param {string} destSheet
  */
-function bmxGetHistory(downLimit, apiKey, apiSecret, destSheet) {
-    // Constrcut the URL https://www.bitmex.com/api/v1/user/walletHistory?currency=XBt&count=100
-    var webSite = "https://www.bitmex.com";
-    var path = "/api/v1/user/walletHistory?currency=XBt&count=" + downLimit;
-    var url = webSite + path;
+function bmxGetTradingHistory(downLimit, apiKey, apiSecret, destSheet) {
     const COLUMN_INDEX = 5; // TODO: set your sheet filter here
-
-    // Construct the signature
-    var nonce = Number(new Date().getTime()).toFixed(0);
-    var string = 'GET' + path + nonce;
-    var sKey = Utilities.computeHmacSha256Signature(string, apiSecret);
-    sKey = sKey.map(function(e) {
-        var v = (e < 0 ? e + 256 : e).toString(16);
-        return v.length == 1 ? "0" + v : v;
-    }).join("");
-
-    // Construct the header details
-    var params = {
-        'method': 'GET',
-        'headers': {
-            'api-signature': sKey,
-            'api-key': apiKey,
-            'api-nonce': nonce
-        },
-        'muteHttpExceptions': true
-    };
-
-    // Send the request to the BitMEX API and receive the user data.
-    var response = UrlFetchApp.fetch(url, params);
-    var dataAll = JSON.parse(response.getContentText());
-    var dataSet = dataAll;
+    // Constrcut the URL https://www.bitmex.com/api/v1/user/walletHistory?currency=XBt&count=100
+    var dataSet = bmxFetch(apiKey, apiSecret, "/api/v1/user/walletHistory?currency=XBt&count=", downLimit);
 
     // Logger.log(dataSet);
     var rows = [];
