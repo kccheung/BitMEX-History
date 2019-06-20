@@ -59,16 +59,21 @@ function getTradingHistory() {
     var ss = SpreadsheetApp.getActive();
     var notBlank = true;
     var i = 3;
-    var sheetConf = "Settings";
+    var settingSheet = ss.getSheetByName("Settings");
+
+    // backup previous row on "total" sheet first
+    var totalSheet = ss.getSheetByName("total");
+    totalSheet.insertRowAfter(2);
+    totalSheet.getRange("2:2").copyTo(totalSheet.getRange(3, 1), { contentsOnly: true });
 
     // For each bot listed in settings; get the API keys from the sheet
     while (notBlank) {
-        var botName = ss.getSheetByName(sheetConf).getRange(i, 1).getValue();
-        var limit = ss.getSheetByName(sheetConf).getRange(i, 5).getValue();
+        var botName = settingSheet.getRange(i, 1).getValue();
+        var limit = settingSheet.getRange(i, 5).getValue();
         var sLimit = Utilities.formatString('%d', limit);
-        var key = ss.getSheetByName(sheetConf).getRange(i, 6).getValue();
-        var secret = ss.getSheetByName(sheetConf).getRange(i, 7).getValue();
-        var destName = ss.getSheetByName(sheetConf).getRange(i, 8).getValue();
+        var key = settingSheet.getRange(i, 6).getValue();
+        var secret = settingSheet.getRange(i, 7).getValue();
+        var destName = settingSheet.getRange(i, 8).getValue();
         if (botName !== "") {
             bmxGetTradingHistory(sLimit, key, secret, destName);
             i++;
@@ -76,6 +81,24 @@ function getTradingHistory() {
             notBlank = false;
         }
     }
+
+    totalSheet.getRange("A2").setValue(Utilities.formatDate(new Date(), "GMT+8", "yyyy-MM-dd HH:mm:ss"));
+}
+
+function getFundingHistory() {
+    // Read the settings for each bot and call bmxGetFundingHistory() for each one
+    //
+    // sheetConf: The name of the configuration sheet to read from
+    //
+    var ss = SpreadsheetApp.getActive();
+    var sheetConf = "Settings";
+
+    // get the first API keys from the sheet
+    var limit = settingSheet.getRange(1, 5).getValue();
+    var sLimit = Utilities.formatString('%d', limit);
+    var key = settingSheet.getRange(1, 6).getValue();
+    var secret = settingSheet.getRange(1, 7).getValue();
+    bmxGetFundingHistory(sLimit, key, secret, "ETHUSD_funding");
 }
 
 //
@@ -104,10 +127,54 @@ function bmxGetTradingHistory(downLimit, apiKey, apiSecret, destSheet) {
     for (var i = 0; i < dataSet.length; i++) {
         data = dataSet[i];
         if (data.transactTime !== null) {
-            // tempDate = new Date(data.transactTime.replace(/^(\d{1,2})[-.](\d{1,2})[-.](\d{4})/g,"$3/$2/$1"));
             tempDate = data.transactTime.replace("T", " ");
             tempDate = tempDate.replace("Z", "");
-            Logger.log(data.transactTime + " > " + tempDate);
+        } else {
+            tempDate = "null"
+        }
+        rows.push([tempDate, data.transactType, data.amount, data.fee, data.address, data.transactStatus, data.walletBalance]);
+    }
+
+    var ss = SpreadsheetApp.getActive();
+    var currentSheet = ss.getSheetByName(destSheet);
+    var header = [];
+    header.push(["transactTime", "transactType", "amount", "fee", "address", "transactStatus", "walletBalance"]);
+    var cell = ss.getSheetByName(destSheet).getRange(1, 1, header.length, 7);
+    cell.setValues(header);
+    var cell = ss.getSheetByName(destSheet).getRange(2, 1, rows.length, 7);
+    cell.setValues(rows);
+    refreshFilter(destSheet, COLUMN_INDEX);
+}
+
+
+//
+// Reads the wallet history
+// apiKey: the cell coordinate for reading the API key
+// apiSecret: the cell coordinate for reading the API secret
+// destSheet: The name of the configuration sheet to read from and write to
+//
+/**
+ * @param {BigInteger} downLimit
+ * @param {string} apiKey
+ * @param {string} apiSecret
+ * @param {string} destSheet
+ */
+function bmxGetFundingHistory(downLimit, apiKey, apiSecret, destSheet) {
+    const COLUMN_INDEX = 5; // TODO: set your sheet filter here
+    // Constrcut the URL https://www.bitmex.com/api/v1/user/walletHistory?currency=XBt&count=100
+    var dataSet = bmxFetch(apiKey, apiSecret, "/api/v1/funding?symbol=ETH&reverse=true&count=", downLimit);
+
+    // Logger.log(dataSet);
+    var rows = [];
+    var data;
+    var tempDate;
+
+    // write the data in rows
+    for (var i = 0; i < dataSet.length; i++) {
+        data = dataSet[i];
+        if (data.timestamp !== null) {
+            tempDate = data.timestamp.replace("T", " ");
+            tempDate = tempDate.replace("Z", "");
         } else {
             tempDate = "null"
         }
