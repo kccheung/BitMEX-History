@@ -136,13 +136,15 @@ function bmxGetTradingHistory(downLimit, apiKey, apiSecret, destSheet) {
     }
 
     var ss = SpreadsheetApp.getActive();
-    var currentSheet = ss.getSheetByName(destSheet);
+    var theSheet = ss.getSheetByName(destSheet);
     var header = [];
     header.push(["transactTime", "transactType", "amount", "fee", "address", "transactStatus", "walletBalance"]);
-    var cell = ss.getSheetByName(destSheet).getRange(1, 1, header.length, 7);
-    cell.setValues(header);
-    var cell = ss.getSheetByName(destSheet).getRange(2, 1, rows.length, 7);
-    cell.setValues(rows);
+    var cells = theSheet.getRange(1, 1, header.length, 7);
+    cells.setValues(header);
+    var cells = theSheet.getRange(2, 1, rows.length + 3, 7); // clear more rows
+    cells.clearContent();
+    var cells = theSheet.getRange(2, 1, rows.length, 7);
+    cells.setValues(rows);
     refreshFilter(destSheet, COLUMN_INDEX);
 }
 
