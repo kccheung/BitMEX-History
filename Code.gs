@@ -45,7 +45,7 @@ function createMenu() {
     var ui = SpreadsheetApp.getUi();
     ui.createMenu('BitMEX Helper')
         .addItem('Download Trade History', 'getTradingHistory')
-        .addItem('Download Funding History', 'getFungingHistory')
+        .addItem('Download Funding History', 'getFundingHistory')
         .addItem('About', 'about')
         .addToUi();
 }
@@ -91,13 +91,13 @@ function getFundingHistory() {
     // sheetConf: The name of the configuration sheet to read from
     //
     var ss = SpreadsheetApp.getActive();
-    var sheetConf = "Settings";
+    var settingSheet = ss.getSheetByName("Settings");
 
     // get the first API keys from the sheet
-    var limit = settingSheet.getRange(1, 5).getValue();
+    var limit = settingSheet.getRange(3, 5).getValue();
     var sLimit = Utilities.formatString('%d', limit);
-    var key = settingSheet.getRange(1, 6).getValue();
-    var secret = settingSheet.getRange(1, 7).getValue();
+    var key = settingSheet.getRange(3, 6).getValue();
+    var secret = settingSheet.getRange(3, 7).getValue();
     bmxGetFundingHistory(sLimit, key, secret, "ETHUSD_funding");
 }
 
@@ -141,7 +141,7 @@ function bmxGetTradingHistory(downLimit, apiKey, apiSecret, destSheet) {
     header.push(["transactTime", "transactType", "amount", "fee", "address", "transactStatus", "walletBalance"]);
     var cells = theSheet.getRange(1, 1, header.length, 7);
     cells.setValues(header);
-    var cells = theSheet.getRange(2, 1, rows.length + 3, 7); // clear more rows
+    var cells = theSheet.getRange(2, 1, rows.length + 3, 7); // clear more rows first
     cells.clearContent();
     var cells = theSheet.getRange(2, 1, rows.length, 7);
     cells.setValues(rows);
@@ -180,18 +180,17 @@ function bmxGetFundingHistory(downLimit, apiKey, apiSecret, destSheet) {
         } else {
             tempDate = "null"
         }
-        rows.push([tempDate, data.transactType, data.amount, data.fee, data.address, data.transactStatus, data.walletBalance]);
+        rows.push([tempDate, data.symbol, data.fundingInterval, data.fundingRate, data.fundingRateDaily]);
     }
 
     var ss = SpreadsheetApp.getActive();
     var currentSheet = ss.getSheetByName(destSheet);
-    var header = [];
-    header.push(["transactTime", "transactType", "amount", "fee", "address", "transactStatus", "walletBalance"]);
-    var cell = ss.getSheetByName(destSheet).getRange(1, 1, header.length, 7);
-    cell.setValues(header);
-    var cell = ss.getSheetByName(destSheet).getRange(2, 1, rows.length, 7);
+    // var header = [];
+    // header.push(["transactTime", "transactType", "amount", "fee", "address", "transactStatus", "walletBalance"]);
+    // var cell = ss.getSheetByName(destSheet).getRange(1, 1, header.length, 7);
+    // cell.setValues(header);
+    var cell = ss.getSheetByName(destSheet).getRange(2, 1, rows.length, 5);
     cell.setValues(rows);
-    refreshFilter(destSheet, COLUMN_INDEX);
 }
 
 
